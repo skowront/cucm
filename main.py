@@ -7,7 +7,7 @@ from urllib3.exceptions import InsecureRequestWarning
 def parse_host_list(value):
     value = value.strip('[]')
     return [host.strip() for host in value.split(',')]
-    
+
 def parse_config_list(value):
     return [metric.strip() for metric in value.strip().splitlines()]
 
@@ -19,7 +19,7 @@ def readConfig():
     secret = config["CUCM"]["secret"]
     servers = parse_host_list(config["SERVERS"]["hosts"])
     return(url,secret,servers)
-    
+
 def readInfra():
     config = configparser.ConfigParser(interpolation=None)
     config.read("bin/infra.conf")
@@ -27,9 +27,9 @@ def readInfra():
     cpu = parse_config_list(config["CPU"]["session"])
     memory = parse_config_list(config["MEMORY"]["session"])
     network = parse_config_list(config["NETWORK"]["session"])
-    
+
     return(cpu,memory,network)
-    
+
 def readPerfList():
     config = configparser.ConfigParser()
     config.read("bin/infra.conf")
@@ -43,23 +43,23 @@ def openSession(cucm, auth):
         'Authorization':'Basic '+auth+'',
         'Content-Type':'text/xml'
     }
-    
+
     data = '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:soap="http://schemas.cisco.com/ast/soap"><soapenv:Header/><soapenv:Body><soap:perfmonOpenSession/></soapenv:Body></soapenv:Envelope>'
-    
+
     requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
     r = requests.post(cucm+'perfmonservice2/services/PerfmonService?wsdl', verify=False, headers=headers, data=data)
     response = ET.fromstring(r.content)
     session_id = response.find(".//{http://schemas.cisco.com/ast/soap}perfmonOpenSessionReturn").text
     return(session_id)
-    
+
 def collectData(cucm, auth, session, flags):
     headers = {
         'Authorization':'Basic '+auth+'',
         'Content-Type':'text/xml'
     }
-    
+
     data = '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:soap="http://schemas.cisco.com/ast/soap"><soapenv:Header/><soapenv:Body><soap:perfmonCollectSessionData><soap:SessionHandle>'+session+'</soap:SessionHandle></soap:perfmonCollectSessionData></soapenv:Body></soapenv:Envelope>'
-    
+
     requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
     r = requests.post(cucm+'perfmonservice2/services/PerfmonService?wsdl', verify=False, headers=headers, data=data)
     # print(r.status_code)
@@ -67,7 +67,7 @@ def collectData(cucm, auth, session, flags):
         if r.status_code != 200:
             return False
         else: return True
-    
+
 def checkSession(cucm, auth):
     if os.path.exists("bin/session"):
         with open("bin/session", "r") as file:
@@ -87,32 +87,32 @@ def checkSession(cucm, auth):
         with open("bin/session", "w") as file:
             # Write content to the file
             file.write(session_id)
-            
+
     return session_id, init
-    
+
 def addCounters(cucm, auth, session, metric):
     headers = {
         'Authorization':'Basic '+auth+'',
         'Content-Type':'text/xml'
     }
-    
+
     data = '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:soap="http://schemas.cisco.com/ast/soap"><soapenv:Header/><soapenv:Body><soap:perfmonAddCounter><soap:SessionHandle>'+session+'</soap:SessionHandle><soap:ArrayOfCounter><soap:Counter><soap:Name>'+metric+'</soap:Name></soap:Counter></soap:ArrayOfCounter></soap:perfmonAddCounter></soapenv:Body></soapenv:Envelope>'
-        
+
     requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
     r = requests.post(cucm+'perfmonservice2/services/PerfmonService?wsdl', verify=False, headers=headers, data=data)
-    
+
 def getCounters(cucm, auth, session):
     headers = {
         'Authorization':'Basic '+auth+'',
         'Content-Type':'text/xml'
     }
-    
+
     data = '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:soap="http://schemas.cisco.com/ast/soap"><soapenv:Header/><soapenv:Body><soap:perfmonCollectSessionData><soap:SessionHandle>'+session+'</soap:SessionHandle></soap:perfmonCollectSessionData></soapenv:Body></soapenv:Envelope>'
-    
+
     requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
     r = requests.post(cucm+'perfmonservice2/services/PerfmonService?wsdl', verify=False, headers=headers, data=data)
     response = ET.fromstring(r.content)
-    
+
     return (response)
 
 def parseCounters(x):
@@ -124,28 +124,28 @@ def parseCounters(x):
     for element in data_elements:
       name_element = element.find('ns1:Name', namespaces={'ns1': 'http://schemas.cisco.com/ast/soap'})
       value_element = element.find('ns1:Value', namespaces={'ns1': 'http://schemas.cisco.com/ast/soap'})
-      
+
       if name_element is not None and value_element is not None:
         # Extract name and value
         name = name_element.text
         value = value_element.text
-        
+
         data[name] = value
     return (data)
-    
+
 def getPerf(cucm, auth, host, metric):
     headers = {
         'Authorization':'Basic '+auth+'',
         'Content-Type':'text/xml'
     }
-    
+
     data = '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:soap="http://schemas.cisco.com/ast/soap"><soapenv:Header/><soapenv:Body><soap:perfmonListInstance><soap:Host>'+host+'</soap:Host><soap:Object>'+metric+'</soap:Object></soap:perfmonListInstance></soapenv:Body></soapenv:Envelope>'
-        
+
     requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
     r = requests.post(cucm+'perfmonservice2/services/PerfmonService?wsdl', verify=False, headers=headers, data=data)
     response = ET.fromstring(r.content)
     return (response)
-    
+
 def parsePerf(x):
     # Find all 'perfmonListInstanceReturn' elements
     data_elements = x.findall('.//ns1:perfmonListInstanceReturn', namespaces={'ns1': 'http://schemas.cisco.com/ast/soap'})
@@ -158,9 +158,9 @@ def parsePerf(x):
         if "Total" not in name_element.text:
             instance_names.append(name_element.text)
     return(len(instance_names))
-    
+
 def printInfraData(x, y):
-    ext = "Custom Metrics|CUCM|"
+    ext = "name=Custom Metrics|CUCM|"
     value = ",value="
     if "" == y:
         for i in x:
