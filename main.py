@@ -48,6 +48,8 @@ def openSession(cucm, auth):
 
     requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
     r = requests.post(cucm+'perfmonservice2/services/PerfmonService?wsdl', verify=False, headers=headers, data=data)
+    print(r.content)
+    print(r.status_code)
     response = ET.fromstring(r.content)
     session_id = response.find(".//{http://schemas.cisco.com/ast/soap}perfmonOpenSessionReturn").text
     return(session_id)
